@@ -45,11 +45,11 @@ LLM_THINK: bool = (
     or "false"
 ).lower() in ("true", "1", "yes")
 
-# Request timeout in seconds (ARM CPU generation can take longer)
+# Request timeout in seconds (ARM CPU generation and cold model swaps can take longer)
 LLM_TIMEOUT: float = float(
     os.getenv("LLM_TIMEOUT")
     or os.getenv("LLN_TIMEOUT")
-    or "300.0"
+    or "600.0"
 )
 
 # Backward compatibility aliases
