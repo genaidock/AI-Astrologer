@@ -1,11 +1,14 @@
 """
 Async client for LLM APIs (Ollama, CodeCraft, OpenAI-compatible).
 
-Supports both streaming (SSE) and non-streaming modes.
+Supports both streaming (SSE) and non-streaming modes with automatic
+fallback across Docker bridge gateway, host.docker.internal, and service discovery.
 """
 
 import json
 import logging
+import socket
+import struct
 from typing import AsyncGenerator
 
 import httpx
@@ -20,8 +23,47 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
-# Configurable timeout: 30s connect, LLM_TIMEOUT (default 300s) read
-TIMEOUT = httpx.Timeout(30.0, read=LLM_TIMEOUT)
+
+def get_docker_gateway() -> str | None:
+    """Auto-detect the container's default gateway IP from /proc/net/route on Linux."""
+    try:
+        with open("/proc/net/route") as f:
+            for line in f:
+                fields = line.strip().split()
+                if len(fields) >= 3 and fields[1] == "00000000":
+                    return socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+    except Exception:
+        pass
+    return None
+
+
+def _get_candidate_urls(url: str) -> list[str]:
+    """
+    Return candidate URLs to attempt.
+    Supports host.docker.internal, auto-detected Docker gateway,
+    common bridge IPs (172.17.0.1, 172.18.0.1), and Coolify internal service 'ollama'.
+    """
+    candidates = [url]
+    if "11434" in url or "ollama" in url.lower():
+        current_host = url.split("://")[1].split(":")[0] if "://" in url else ""
+        alt_hosts = []
+
+        # 1. Detected Linux Docker network gateway (points back to the host machine)
+        gw = get_docker_gateway()
+        if gw and gw not in alt_hosts:
+            alt_hosts.append(gw)
+
+        # 2. Standard alternatives for reaching Ollama inside Docker
+        for h in ["host.docker.internal", "172.17.0.1", "172.18.0.1", "ollama", "localhost"]:
+            if h not in alt_hosts:
+                alt_hosts.append(h)
+
+        for h in alt_hosts:
+            if h != current_host:
+                alt_url = url.replace(f"://{current_host}:", f"://{h}:")
+                if alt_url not in candidates:
+                    candidates.append(alt_url)
+    return candidates
 
 
 async def chat_completion(
@@ -53,6 +95,8 @@ async def chat_completion(
 
     target_model = model or LLM_MODEL
 
+    # Standard OpenAI payload — DO NOT inject unsupported top-level fields
+    # like 'options' or 'think' which cause Ollama /v1/chat/completions to return 400
     payload = {
         "model": target_model,
         "messages": messages,
@@ -61,13 +105,9 @@ async def chat_completion(
         "max_tokens": max_tokens,
     }
 
-    # Ollama reasoning/thinking control:
-    # When LLM_THINK is False, suppress internal reasoning to ensure fast ~5-15s generation
-    is_ollama = "11434" in LLM_API_BASE or "ollama" in LLM_API_BASE.lower()
-    if is_ollama:
-        payload["options"] = {"temperature": temperature}
-        if not LLM_THINK:
-            payload["think"] = False
+    # If thinking is disabled for reasoning models (Qwen, DeepSeek), pass standard reasoning_effort
+    if not LLM_THINK:
+        payload["reasoning_effort"] = "none"
 
     logger.debug(f"Calling LLM: model={target_model}, url={url}, stream={stream}")
 
@@ -77,32 +117,23 @@ async def chat_completion(
         return await _full_response(url, headers, payload)
 
 
-def _get_candidate_urls(url: str) -> list[str]:
-    """
-    Return candidate URLs to attempt.
-    If URL points to host.docker.internal, include 172.17.0.1 as an automatic
-    Docker bridge gateway fallback for Linux environments.
-    """
-    candidates = [url]
-    if "host.docker.internal" in url:
-        candidates.append(url.replace("host.docker.internal", "172.17.0.1"))
-    return candidates
-
-
 async def _stream_response(
     url: str, headers: dict, payload: dict
 ) -> AsyncGenerator[str, None]:
     """Stream SSE chunks from the API with automatic gateway fallback."""
     candidate_urls = _get_candidate_urls(url)
-    
+    last_error = None
+
     for attempt_idx, candidate_url in enumerate(candidate_urls):
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        conn_timeout = httpx.Timeout(LLM_TIMEOUT, connect=4.0)
+        async with httpx.AsyncClient(timeout=conn_timeout) as client:
             try:
                 async with client.stream("POST", candidate_url, headers=headers, json=payload) as resp:
                     if resp.status_code != 200:
                         body = await resp.aread()
-                        logger.error(f"LLM API error {resp.status_code}: {body.decode(errors='replace')}")
-                        yield f"Error: LLM API returned status {resp.status_code}"
+                        err_msg = body.decode(errors="replace")
+                        logger.error(f"LLM API error {resp.status_code} at {candidate_url}: {err_msg}")
+                        yield f"Error: LLM API returned status {resp.status_code}: {err_msg}"
                         return
 
                     async for line in resp.aiter_lines():
@@ -121,43 +152,58 @@ async def _stream_response(
                             except json.JSONDecodeError:
                                 continue
                 return
-            except httpx.ConnectError:
-                if attempt_idx < len(candidate_urls) - 1:
-                    logger.warning(f"Connection to {candidate_url} failed; trying fallback {candidate_urls[attempt_idx + 1]}")
-                    continue
-                logger.error(f"Cannot connect to LLM server at {candidate_url}. Is Ollama or the API service running?")
-                yield "Error: Could not connect to the AI model server. Please verify the Ollama endpoint is running."
-                return
-            except httpx.ReadTimeout:
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError, httpx.RequestError) as e:
+                last_error = e
+                logger.warning(
+                    f"Connection to {candidate_url} failed ({type(e).__name__}: {e}); trying next candidate..."
+                )
+                continue
+            except httpx.ReadTimeout as e:
                 logger.error(f"LLM request timed out after {LLM_TIMEOUT}s at {candidate_url}")
-                yield "Error: The model took too long to respond. Please try again."
+                yield f"Error: The AI model took too long to respond ({LLM_TIMEOUT}s timeout). Please try again."
                 return
+            except Exception as e:
+                logger.exception(f"Unexpected streaming error at {candidate_url}")
+                yield f"Error: {type(e).__name__}: {str(e)}"
+                return
+
+    # If all candidates failed to connect:
+    logger.error(f"All candidate endpoints failed: {candidate_urls}. Last error: {last_error}")
+    yield (
+        f"Error: Could not connect to AI model server. "
+        f"Attempted: {', '.join(candidate_urls)}. "
+        f"Detail: {type(last_error).__name__ if last_error else 'Unknown'}: {str(last_error)}"
+    )
 
 
 async def _full_response(url: str, headers: dict, payload: dict) -> str:
     """Get full (non-streaming) response from the API with automatic gateway fallback."""
     candidate_urls = _get_candidate_urls(url)
-    
+    last_error = None
+
     for attempt_idx, candidate_url in enumerate(candidate_urls):
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        conn_timeout = httpx.Timeout(LLM_TIMEOUT, connect=4.0)
+        async with httpx.AsyncClient(timeout=conn_timeout) as client:
             try:
                 resp = await client.post(candidate_url, headers=headers, json=payload)
                 if resp.status_code != 200:
-                    logger.error(f"LLM API error {resp.status_code}: {resp.text}")
-                    return f"Error: LLM API returned status {resp.status_code}"
+                    logger.error(f"LLM API error {resp.status_code} at {candidate_url}: {resp.text}")
+                    return f"Error: LLM API returned status {resp.status_code}: {resp.text}"
 
                 data = resp.json()
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            except httpx.ConnectError:
-                if attempt_idx < len(candidate_urls) - 1:
-                    logger.warning(f"Connection to {candidate_url} failed; trying fallback {candidate_urls[attempt_idx + 1]}")
-                    continue
-                logger.error(f"Cannot connect to LLM server at {candidate_url}")
-                return "Error: Could not connect to the AI model server."
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError, httpx.RequestError) as e:
+                last_error = e
+                logger.warning(
+                    f"Connection to {candidate_url} failed ({type(e).__name__}: {e}); trying next candidate..."
+                )
+                continue
             except httpx.ReadTimeout:
-                logger.error(f"LLM request timed out at {candidate_url}")
-                return "Error: Request to AI model timed out."
+                return f"Error: Request to AI model timed out after {LLM_TIMEOUT}s."
+            except Exception as e:
+                return f"Error: {type(e).__name__}: {str(e)}"
 
+    return f"Error: Could not connect to AI model. Attempted: {', '.join(candidate_urls)}. ({last_error})"
 
 
 async def get_models() -> list[dict]:
@@ -165,29 +211,30 @@ async def get_models() -> list[dict]:
     Fetch available models from Ollama / OpenAI-compatible / CodeCraft API catalog.
     Falls back gracefully to the configured default model if endpoint is unavailable.
     """
-    url = f"{LLM_API_BASE}/models"
+    candidate_bases = _get_candidate_urls(LLM_API_BASE)
     headers = {}
     if LLM_API_KEY:
         headers["Authorization"] = f"Bearer {LLM_API_KEY}"
 
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code == 200:
-                data = resp.json().get("data", [])
-                if data:
-                    return [
-                        {
-                            "id": m.get("id"),
-                            "display_name": m.get("name") or m.get("id"),
-                        }
-                        for m in data
-                        if m.get("id")
-                    ]
-            
-            # If /v1/models fails or is empty, try Ollama native /api/tags
-            if "11434" in LLM_API_BASE or "ollama" in LLM_API_BASE.lower():
-                root_base = LLM_API_BASE.replace("/v1", "")
+    for base in candidate_bases:
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0)) as client:
+                # Try standard /models
+                resp = await client.get(f"{base}/models", headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    if data:
+                        return [
+                            {
+                                "id": m.get("id"),
+                                "display_name": m.get("name") or m.get("id"),
+                            }
+                            for m in data
+                            if m.get("id")
+                        ]
+
+                # If /v1/models fails or is empty, try Ollama native /api/tags
+                root_base = base.replace("/v1", "")
                 tags_resp = await client.get(f"{root_base}/api/tags")
                 if tags_resp.status_code == 200:
                     models_list = tags_resp.json().get("models", [])
@@ -200,9 +247,8 @@ async def get_models() -> list[dict]:
                             for m in models_list
                             if m.get("name") or m.get("model")
                         ]
-    except Exception as e:
-        logger.warning(f"Could not load dynamic models list from {url}: {e}")
+        except Exception:
+            continue
 
     # Fallback to configured model so frontend always has an active model option
     return [{"id": LLM_MODEL, "display_name": LLM_MODEL}]
-

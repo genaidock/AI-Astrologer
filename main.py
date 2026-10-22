@@ -68,6 +68,41 @@ async def health_check():
         "model": LLM_MODEL,
     }
 
+# Diagnostic endpoint to verify LLM network connectivity from inside Docker
+@app.get("/api/debug-llm", tags=["system"])
+async def debug_llm():
+    """Probe Ollama and candidate URLs to identify network reachability."""
+    import httpx
+    from llm.client import get_docker_gateway, _get_candidate_urls
+
+    gw = get_docker_gateway()
+    candidates = _get_candidate_urls(LLM_API_BASE)
+
+    probes = {}
+    for c in candidates:
+        root = c.replace("/v1", "").replace("/chat/completions", "").rstrip("/")
+        tags_url = f"{root}/api/tags"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(4.0, connect=2.0)) as client:
+                res = await client.get(tags_url)
+                if res.status_code == 200:
+                    models = [m.get("name") for m in res.json().get("models", [])]
+                    probes[tags_url] = {"status": 200, "models": models}
+                else:
+                    probes[tags_url] = {"status": res.status_code, "body": res.text[:200]}
+        except Exception as e:
+            probes[tags_url] = f"{type(e).__name__}: {str(e)}"
+
+    return {
+        "status": "diagnostic",
+        "container_gateway": gw,
+        "configured_llm_base": LLM_API_BASE,
+        "configured_model": LLM_MODEL,
+        "candidates_evaluated": candidates,
+        "probes": probes,
+    }
+
+
 # Register API routes
 app.include_router(chart_router)
 app.include_router(chat_router)

@@ -114,8 +114,7 @@ async def chat_with_astrologer(req: ChatRequest, request: Request):
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.exception("Chat streaming error")
-            # Don't leak internal error details to the client
-            yield f"data: {json.dumps({'error': 'An error occurred while generating the response.'})}\n\n"
+            yield f"data: {json.dumps({'error': f'{type(e).__name__}: {str(e)}'})}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -155,8 +154,7 @@ async def get_horoscope(req: HoroscopeRequest, request: Request):
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.exception("Horoscope streaming error")
-            # Don't leak internal error details to the client
-            yield f"data: {json.dumps({'error': 'An error occurred while generating the horoscope.'})}\n\n"
+            yield f"data: {json.dumps({'error': f'{type(e).__name__}: {str(e)}'})}\n\n"
 
     return StreamingResponse(
         event_generator(),
