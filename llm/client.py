@@ -95,8 +95,7 @@ async def chat_completion(
 
     target_model = model or LLM_MODEL
 
-    # Standard OpenAI payload — DO NOT inject unsupported top-level fields
-    # like 'options' or 'think' which cause Ollama /v1/chat/completions to return 400
+    # Standard OpenAI payload — keep minimal and compliant
     payload = {
         "model": target_model,
         "messages": messages,
@@ -104,10 +103,6 @@ async def chat_completion(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-
-    # If thinking is disabled for reasoning models (Qwen, DeepSeek), pass standard reasoning_effort
-    if not LLM_THINK:
-        payload["reasoning_effort"] = "none"
 
     logger.debug(f"Calling LLM: model={target_model}, url={url}, stream={stream}")
 
