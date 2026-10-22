@@ -147,16 +147,16 @@ async def _stream_response(
                             except json.JSONDecodeError:
                                 continue
                 return
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError, httpx.RequestError) as e:
+            except httpx.ReadTimeout as e:
+                logger.error(f"LLM request timed out waiting for response after {LLM_TIMEOUT}s at {candidate_url}")
+                yield f"Error: The AI model took longer than {LLM_TIMEOUT}s to respond (it may still be loading into RAM on first use). Please try again in a few moments."
+                return
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
                 last_error = e
                 logger.warning(
                     f"Connection to {candidate_url} failed ({type(e).__name__}: {e}); trying next candidate..."
                 )
                 continue
-            except httpx.ReadTimeout as e:
-                logger.error(f"LLM request timed out after {LLM_TIMEOUT}s at {candidate_url}")
-                yield f"Error: The AI model took too long to respond ({LLM_TIMEOUT}s timeout). Please try again."
-                return
             except Exception as e:
                 logger.exception(f"Unexpected streaming error at {candidate_url}")
                 yield f"Error: {type(e).__name__}: {str(e)}"
@@ -187,14 +187,14 @@ async def _full_response(url: str, headers: dict, payload: dict) -> str:
 
                 data = resp.json()
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError, httpx.RequestError) as e:
+            except httpx.ReadTimeout:
+                return f"Error: Request to AI model timed out after {LLM_TIMEOUT}s."
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
                 last_error = e
                 logger.warning(
                     f"Connection to {candidate_url} failed ({type(e).__name__}: {e}); trying next candidate..."
                 )
                 continue
-            except httpx.ReadTimeout:
-                return f"Error: Request to AI model timed out after {LLM_TIMEOUT}s."
             except Exception as e:
                 return f"Error: {type(e).__name__}: {str(e)}"
 
