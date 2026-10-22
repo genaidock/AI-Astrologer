@@ -77,59 +77,87 @@ async def chat_completion(
         return await _full_response(url, headers, payload)
 
 
+def _get_candidate_urls(url: str) -> list[str]:
+    """
+    Return candidate URLs to attempt.
+    If URL points to host.docker.internal, include 172.17.0.1 as an automatic
+    Docker bridge gateway fallback for Linux environments.
+    """
+    candidates = [url]
+    if "host.docker.internal" in url:
+        candidates.append(url.replace("host.docker.internal", "172.17.0.1"))
+    return candidates
+
+
 async def _stream_response(
     url: str, headers: dict, payload: dict
 ) -> AsyncGenerator[str, None]:
-    """Stream SSE chunks from the API."""
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        try:
-            async with client.stream("POST", url, headers=headers, json=payload) as resp:
-                if resp.status_code != 200:
-                    body = await resp.aread()
-                    logger.error(f"LLM API error {resp.status_code}: {body.decode(errors='replace')}")
-                    yield f"Error: LLM API returned status {resp.status_code}"
-                    return
+    """Stream SSE chunks from the API with automatic gateway fallback."""
+    candidate_urls = _get_candidate_urls(url)
+    
+    for attempt_idx, candidate_url in enumerate(candidate_urls):
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            try:
+                async with client.stream("POST", candidate_url, headers=headers, json=payload) as resp:
+                    if resp.status_code != 200:
+                        body = await resp.aread()
+                        logger.error(f"LLM API error {resp.status_code}: {body.decode(errors='replace')}")
+                        yield f"Error: LLM API returned status {resp.status_code}"
+                        return
 
-                async for line in resp.aiter_lines():
-                    if not line.strip():
-                        continue
-                    if line.startswith("data: "):
-                        data = line[6:]
-                        if data.strip() == "[DONE]":
-                            return
-                        try:
-                            chunk = json.loads(data)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content", "")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
+                    async for line in resp.aiter_lines():
+                        if not line.strip():
                             continue
-        except httpx.ConnectError:
-            logger.error(f"Cannot connect to LLM server at {url}. Is Ollama or the API service running?")
-            yield "Error: Could not connect to the AI model server. Please verify the Ollama endpoint is running."
-        except httpx.ReadTimeout:
-            logger.error(f"LLM request timed out after {LLM_TIMEOUT}s at {url}")
-            yield "Error: The model took too long to respond. Please try again."
+                        if line.startswith("data: "):
+                            data = line[6:]
+                            if data.strip() == "[DONE]":
+                                return
+                            try:
+                                chunk = json.loads(data)
+                                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                continue
+                return
+            except httpx.ConnectError:
+                if attempt_idx < len(candidate_urls) - 1:
+                    logger.warning(f"Connection to {candidate_url} failed; trying fallback {candidate_urls[attempt_idx + 1]}")
+                    continue
+                logger.error(f"Cannot connect to LLM server at {candidate_url}. Is Ollama or the API service running?")
+                yield "Error: Could not connect to the AI model server. Please verify the Ollama endpoint is running."
+                return
+            except httpx.ReadTimeout:
+                logger.error(f"LLM request timed out after {LLM_TIMEOUT}s at {candidate_url}")
+                yield "Error: The model took too long to respond. Please try again."
+                return
 
 
 async def _full_response(url: str, headers: dict, payload: dict) -> str:
-    """Get full (non-streaming) response from the API."""
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        try:
-            resp = await client.post(url, headers=headers, json=payload)
-            if resp.status_code != 200:
-                logger.error(f"LLM API error {resp.status_code}: {resp.text}")
-                return f"Error: LLM API returned status {resp.status_code}"
+    """Get full (non-streaming) response from the API with automatic gateway fallback."""
+    candidate_urls = _get_candidate_urls(url)
+    
+    for attempt_idx, candidate_url in enumerate(candidate_urls):
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            try:
+                resp = await client.post(candidate_url, headers=headers, json=payload)
+                if resp.status_code != 200:
+                    logger.error(f"LLM API error {resp.status_code}: {resp.text}")
+                    return f"Error: LLM API returned status {resp.status_code}"
 
-            data = resp.json()
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        except httpx.ConnectError:
-            logger.error(f"Cannot connect to LLM server at {url}")
-            return "Error: Could not connect to the AI model server."
-        except httpx.ReadTimeout:
-            logger.error(f"LLM request timed out at {url}")
-            return "Error: Request to AI model timed out."
+                data = resp.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            except httpx.ConnectError:
+                if attempt_idx < len(candidate_urls) - 1:
+                    logger.warning(f"Connection to {candidate_url} failed; trying fallback {candidate_urls[attempt_idx + 1]}")
+                    continue
+                logger.error(f"Cannot connect to LLM server at {candidate_url}")
+                return "Error: Could not connect to the AI model server."
+            except httpx.ReadTimeout:
+                logger.error(f"LLM request timed out at {candidate_url}")
+                return "Error: Request to AI model timed out."
+
 
 
 async def get_models() -> list[dict]:

@@ -26,11 +26,12 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000 \
     HOST=0.0.0.0
 
-EXPOSE 8000
+EXPOSE 8000 3000
 
-# Container healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+# Container healthcheck: dynamically checks configured PORT, with fallbacks to 8000 and 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD sh -c "curl -f http://localhost:\${PORT:-8000}/api/health || curl -f http://localhost:8000/api/health || curl -f http://localhost:3000/api/health || exit 1"
 
 # Start FastAPI application
 CMD ["python", "main.py"]
+
