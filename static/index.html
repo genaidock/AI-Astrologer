@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮 AI Jyotish Guru — Vedic Astrologer & Cosmic Oracle</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- ═══════════════ Starfield Background ═══════════════ -->
+    <div class="starfield" id="starfield"></div>
+
+    <!-- ═══════════════ App Container ═══════════════ -->
+    <div class="app-container">
+
+        <!-- ─── Header ─── -->
+        <header class="app-header">
+            <div class="logo-area" onclick="switchTab('chat')">
+                <span class="logo-icon">🔮</span>
+                <div class="logo-title">
+                    <h1>Jyotish Guru</h1>
+                    <span class="logo-subtitle">
+                        Vedic Astrologer & Oracle
+                        <span class="live-badge"><span class="pulse-dot"></span> LIVE</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Header Controls: User profile, Brain selector, Nav tabs -->
+            <div class="header-controls">
+                <div id="userProfileChip" class="user-profile-chip" style="display:none;" onclick="openBirthModal()" title="Click to view or edit birth chart details">
+                    <span>👤</span>
+                    <span id="userProfileText">Seeker</span>
+                    <span style="font-size: 10px; opacity: 0.7;">✏️</span>
+                </div>
+
+                <div class="model-selector-pill" title="Select AI Reasoning Model">
+                    <span class="model-pill-icon">✨</span>
+                    <select id="modelSelect" class="model-selector">
+                        <option value="claude-opus-4.8">claude-opus-4.8</option>
+                    </select>
+                </div>
+
+                <nav class="nav-tabs" id="mainNavTabs">
+                    <button class="nav-tab active" data-tab="chat" onclick="switchTab('chat')">
+                        <span>💬</span> Chat
+                    </button>
+                    <button class="nav-tab" data-tab="kundli" onclick="switchTab('kundli')">
+                        <span>🪷</span> Kundli
+                    </button>
+                    <button class="nav-tab" data-tab="horoscope" onclick="switchTab('horoscope')">
+                        <span>⭐</span> Rashifal
+                    </button>
+                    <button class="nav-tab" data-tab="compatibility" onclick="switchTab('compatibility')">
+                        <span>❤️</span> Milan
+                    </button>
+                    <button class="nav-tab" data-tab="numerology" onclick="switchTab('numerology')">
+                        <span>🔢</span> Ank Jyotish
+                    </button>
+                    <button class="nav-tab" data-tab="tarot" onclick="switchTab('tarot')">
+                        <span>🃏</span> Tarot & Prashna
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- ─── Live Planetary Transit Ticker (Gochar Bar) ─── -->
+        <div class="gochar-ticker-bar" id="gocharTickerBar">
+            <div class="ticker-label" onclick="openGocharModal()" title="View Complete Gochar Planetary Matrix">
+                <span>🪐 GOCHAR</span>
+                <span style="font-size: 10px;">➔</span>
+            </div>
+            <div class="ticker-track-wrap">
+                <div class="ticker-track" id="transitTickerTrack">
+                    <span class="transit-chip"><span class="graha-sym">☀️</span> Surya in <span class="rashi-name">Kanya</span></span>
+                    <span class="transit-chip"><span class="graha-sym">🌙</span> Chandra in <span class="rashi-name">Simha</span></span>
+                    <span class="transit-chip"><span class="graha-sym">♃</span> Guru in <span class="rashi-name">Karka</span></span>
+                    <span class="transit-chip"><span class="graha-sym">♄</span> Shani in <span class="rashi-name">Meena</span> <span class="retro-tag">℞</span></span>
+                    <span class="transit-chip"><span class="graha-sym">♂</span> Mangal in <span class="rashi-name">Karka</span></span>
+                    <span class="transit-chip"><span class="graha-sym">♀</span> Shukra in <span class="rashi-name">Tula</span> <span class="retro-tag">℞</span></span>
+                    <span class="transit-chip"><span class="graha-sym">☿</span> Budha in <span class="rashi-name">Tula</span></span>
+                    <span class="transit-chip"><span class="graha-sym">☊</span> Rahu in <span class="rashi-name">Kumbha</span> <span class="retro-tag">℞</span></span>
+                    <span class="transit-chip"><span class="graha-sym">☋</span> Ketu in <span class="rashi-name">Simha</span> <span class="retro-tag">℞</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             1. CHAT TAB
+             ═══════════════════════════════════════════════════════ -->
+        <section class="tab-content active" id="tab-chat">
+            
+            <!-- Birth Details Form Overlay (when first visiting without saved details) -->
+            <div class="birth-form-overlay" id="birthFormOverlay">
+                <div class="birth-form-card glass-card">
+                    <div class="form-header">
+                        <span class="form-icon">🪷</span>
+                        <h2>Vedic Kundli Consultation</h2>
+                        <p>Enter your birth coordinates to generate your high-precision Vedic Janma Kundli (Lahiri Ayanamsa).</p>
+                    </div>
+                    <form id="birthForm" onsubmit="submitBirthDetails(event)">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label for="name">Your Name</label>
+                                <input type="text" id="name" placeholder="e.g. Arjun Sharma" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="birthDate">Birth Date</label>
+                                <input type="date" id="birthDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="birthTime">Birth Time</label>
+                                <input type="time" id="birthTime" value="12:00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="city">City of Birth</label>
+                                <input type="text" id="city" placeholder="e.g. Mumbai, New Delhi, London" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="nation">Country Code</label>
+                                <input type="text" id="nation" placeholder="IN, US, GB" value="IN" maxlength="2" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" id="generateBtn">
+                            <span class="btn-text">🪷 Generate My Kundli & Begin</span>
+                            <span class="btn-loader" style="display:none;">
+                                <span class="spinner"></span> Aligning Celestial Grahas...
+                            </span>
+                        </button>
+                        <button type="button" class="btn-secondary" style="width:100%; margin-top:10px;" onclick="skipBirthDetails()">
+                            ⚡ Skip for now — General Vedic Chat
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Active Chat Interface -->
+            <div class="chat-container" id="chatContainer" style="display:none;">
+                
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Welcome Hero Banner -->
+                    <div class="welcome-hero-card" id="chatWelcomeHero">
+                        <h3>✨ Namaste & Welcome to Jyotish Guru</h3>
+                        <p>Ask anything about your Vedic natal chart, Vimshottari Dashas, Gochar transits, career peaks, relationship compatibility, Sade Sati, or spiritual remedies.</p>
+                        <div class="suggestion-chips-grid">
+                            <button class="suggestion-chip" onclick="sendQuickPrompt('✨ What does my 7th house say about marriage & life partner?')">
+                                💍 7th House & Marriage
+                            </button>
+                            <button class="suggestion-chip" onclick="sendQuickPrompt('🔮 When will my career peak according to my Dasha and 10th house?')">
+                                💼 Career & Dasha Peak
+                            </button>
+                            <button class="suggestion-chip" onclick="sendQuickPrompt('🪐 Is Shani Sade Sati or Dhaiya currently active for my Moon sign?')">
+                                🪐 Shani Sade Sati Check
+                            </button>
+                            <button class="suggestion-chip" onclick="sendQuickPrompt('💎 What is my most auspicious gemstone and Vedic deity?')">
+                                💎 Lucky Gemstone & Mantra
+                            </button>
+                            <button class="suggestion-chip" onclick="sendQuickPrompt('🌿 What Vedic remedies (Upayas) should I perform for current planetary peace?')">
+                                🌿 Vedic Upayas & Remedies
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Input Area -->
+                <div class="chat-input-area">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="chatInput" 
+                            placeholder="Ask Guru about your chart, planets, Dashas, remedies..." 
+                            rows="1"
+                            onkeydown="handleChatKeydown(event)"
+                        ></textarea>
+                        <div class="input-quick-actions">
+                            <button class="btn-send" onclick="sendMessage()" id="sendBtn" title="Send Message (Enter)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             2. KUNDLI TAB
+             ═══════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-kundli">
+            <div class="tab-scroll-wrapper" id="kundliContainer">
+                
+                <!-- Kundli Empty Placeholder (before chart is computed) -->
+                <div class="kundli-placeholder glass-card" id="kundliPlaceholder">
+                    <span class="placeholder-icon">🪷</span>
+                    <h3>Janma Kundli (Birth Chart)</h3>
+                    <p>Enter your birth coordinates to generate your interactive North Indian Vedic Kundli with real-time house inspection and Graha dignity metrics.</p>
+                    <button class="btn-primary btn-gold" style="margin-top:16px;" onclick="openBirthModal()">
+                        ✨ Enter Birth Details
+                    </button>
+                </div>
+
+                <!-- Kundli Active Content (rendered when chartData exists) -->
+                <div id="kundliActiveContent" style="display:none; width: 100%;">
+                    
+                    <!-- Kundli Top Bar -->
+                    <div class="kundli-header-bar glass-card">
+                        <div class="kundli-title-group">
+                            <h2 id="kundliSeekerName">🪷 Vedic Kundli — Seeker</h2>
+                            <p id="kundliBirthMeta">Sidereal Zodiac • Lahiri Ayanamsa • Whole Sign Bhava</p>
+                        </div>
+                        <div class="kundli-view-toggle">
+                            <button class="view-btn active" id="btnViewNorth" onclick="setKundliView('north')">North Diamond</button>
+                            <button class="view-btn" id="btnViewTable" onclick="setKundliView('table')">Graha Matrix</button>
+                            <button class="view-btn" id="btnViewWheel" onclick="setKundliView('wheel')">Western Wheel</button>
+                        </div>
+                    </div>
+
+                    <!-- Kundli Badges Summary Grid -->
+                    <div class="kundli-badges-grid">
+                        <div class="kundli-badge-card">
+                            <div class="badge-icon-wrap">🪷</div>
+                            <div class="badge-info">
+                                <h4>Lagna (Ascendant)</h4>
+                                <div class="badge-value" id="badgeLagnaVal">Simha ♌</div>
+                                <div class="badge-sub" id="badgeLagnaNak">Magha Pada 2</div>
+                            </div>
+                        </div>
+                        <div class="kundli-badge-card">
+                            <div class="badge-icon-wrap">☀️</div>
+                            <div class="badge-info">
+                                <h4>Surya Rashi (Sun)</h4>
+                                <div class="badge-value" id="badgeSunVal">Mesha ♈</div>
+                                <div class="badge-sub" id="badgeSunNak">Ashwini Pada 1</div>
+                            </div>
+                        </div>
+                        <div class="kundli-badge-card">
+                            <div class="badge-icon-wrap">🌙</div>
+                            <div class="badge-info">
+                                <h4>Chandra Rashi (Moon)</h4>
+                                <div class="badge-value" id="badgeMoonVal">Kanya ♍</div>
+                                <div class="badge-sub" id="badgeMoonNak">Chitra Pada 2</div>
+                            </div>
+                        </div>
+                        <div class="kundli-badge-card">
+                            <div class="badge-icon-wrap">⏳</div>
+                            <div class="badge-info">
+                                <h4>Current Dasha Period</h4>
+                                <div class="badge-value" id="badgeDashaVal">Guru - Shani</div>
+                                <div class="badge-sub" id="badgeDashaSub">Vimshottari 120y Cycle</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visual Section: North Indian SVG + House Inspector -->
+                    <div class="kundli-visual-layout" id="kundliVisualLayout">
+                        
+                        <!-- Left: North Indian Diamond Kundli SVG -->
+                        <div class="kundli-svg-wrapper glass-card">
+                            <div id="northIndianSvgContainer" style="width: 100%; display: flex; justify-content: center;">
+                                <!-- SVG is injected here -->
+                            </div>
+                        </div>
+
+                        <!-- Right: Interactive House Inspector Card -->
+                        <div class="house-inspector-card glass-card" id="houseInspectorCard">
+                            <div class="inspector-header">
+                                <div class="inspector-title">
+                                    <h3 id="inspectHouseTitle">House 1: Tanu Bhava</h3>
+                                    <span id="inspectHouseRashi">Rashi: Mesha ♈ (Aries)</span>
+                                </div>
+                                <span class="dignity-badge exalted" id="inspectHouseLordBadge">Lord: Mangal ♂</span>
+                            </div>
+
+                            <div class="inspector-meta-grid">
+                                <div class="meta-item">
+                                    <div class="meta-label">House Type</div>
+                                    <div class="meta-val" id="inspectHouseType">Kendra & Trikona (Dharma)</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-label">Resident Grahas</div>
+                                    <div class="meta-val" id="inspectHouseGrahas">☀️ Sun (Exalted)</div>
+                                </div>
+                            </div>
+
+                            <div class="inspector-significance">
+                                <h4>✨ Core Karakatvas (Significations):</h4>
+                                <p id="inspectHouseSignificance">Self, physical body, vitality, personality, soul's constitutional temperament, and outer life trajectory.</p>
+                            </div>
+
+                            <div class="inspector-significance">
+                                <h4>🪐 Grahas in this House:</h4>
+                                <div class="occupant-chips" id="inspectOccupantChips">
+                                    <span class="occupant-chip">☀️ Sun in Mesha (0.98°)</span>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 16px; display: flex; gap: 8px;">
+                                <button class="btn-primary" style="flex: 1; font-size: 13px; padding: 8px 12px;" onclick="askGuruAboutSelectedHouse()">
+                                    🔮 Ask Guru About This House
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graha Placement Table Card -->
+                    <div class="graha-table-container glass-card" id="grahaTableSection" style="margin-top: 20px;">
+                        <h3 style="font-family: var(--font-display); color: var(--accent-gold); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>🪷 Graha Positions & Planetary Dignities</span>
+                            <span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;">9 Vedic Grahas + Lagna</span>
+                        </h3>
+                        <table class="graha-table">
+                            <thead>
+                                <tr>
+                                    <th>Graha</th>
+                                    <th>Rashi (Sign)</th>
+                                    <th>Bhava</th>
+                                    <th>Nakshatra & Pada</th>
+                                    <th>Degrees</th>
+                                    <th>Dignity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="grahaTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Alternate Wheel Chart View Container -->
+                    <div id="wheelChartContainer" class="glass-card" style="display:none; padding: 20px; margin-top: 20px; text-align: center;">
+                        <!-- Kerykeion SVG chart injected here -->
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             3. RASHIFAL (HOROSCOPE) TAB
+             ═══════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-horoscope">
+            <div class="tab-scroll-wrapper">
+                
+                <div class="rashi-hero-section glass-card">
+                    <h2>🌟 Vedic Rashifal & Daily Forecast</h2>
+                    <p>Select your Vedic Moon Sign (Chandra Rashi) or Sun Sign to receive a customized forecast and astrological remedies.</p>
+
+                    <!-- Period Toggles -->
+                    <div class="period-toggle-group">
+                        <button class="period-pill active" data-period="daily" onclick="setPeriod('daily')">
+                            ☀️ Daily (Aaj Ka)
+                        </button>
+                        <button class="period-pill" data-period="weekly" onclick="setPeriod('weekly')">
+                            📅 Weekly (Saptahik)
+                        </button>
+                        <button class="period-pill" data-period="monthly" onclick="setPeriod('monthly')">
+                            🌙 Monthly (Masik)
+                        </button>
+                    </div>
+
+                    <!-- 12 Vedic Rashi Grid -->
+                    <div class="rashi-cards-grid">
+                        <div class="rashi-card element-fire" onclick="getHoroscope('Mesha', this)">
+                            <span class="rashi-glyph">♈</span>
+                            <div class="rashi-sanskrit">Mesha</div>
+                            <div class="rashi-english">Aries</div>
+                            <span class="rashi-element-tag">🔥 Agni • Mars</span>
+                        </div>
+                        <div class="rashi-card element-earth" onclick="getHoroscope('Vrishabha', this)">
+                            <span class="rashi-glyph">♉</span>
+                            <div class="rashi-sanskrit">Vrishabha</div>
+                            <div class="rashi-english">Taurus</div>
+                            <span class="rashi-element-tag">🌍 Prithvi • Venus</span>
+                        </div>
+                        <div class="rashi-card element-air" onclick="getHoroscope('Mithuna', this)">
+                            <span class="rashi-glyph">♊</span>
+                            <div class="rashi-sanskrit">Mithuna</div>
+                            <div class="rashi-english">Gemini</div>
+                            <span class="rashi-element-tag">💨 Vayu • Mercury</span>
+                        </div>
+                        <div class="rashi-card element-water" onclick="getHoroscope('Karka', this)">
+                            <span class="rashi-glyph">♋</span>
+                            <div class="rashi-sanskrit">Karka</div>
+                            <div class="rashi-english">Cancer</div>
+                            <span class="rashi-element-tag">🌊 Jala • Moon</span>
+                        </div>
+                        <div class="rashi-card element-fire" onclick="getHoroscope('Simha', this)">
+                            <span class="rashi-glyph">♌</span>
+                            <div class="rashi-sanskrit">Simha</div>
+                            <div class="rashi-english">Leo</div>
+                            <span class="rashi-element-tag">🔥 Agni • Sun</span>
+                        </div>
+                        <div class="rashi-card element-earth" onclick="getHoroscope('Kanya', this)">
+                            <span class="rashi-glyph">♍</span>
+                            <div class="rashi-sanskrit">Kanya</div>
+                            <div class="rashi-english">Virgo</div>
+                            <span class="rashi-element-tag">🌍 Prithvi • Mercury</span>
+                        </div>
+                        <div class="rashi-card element-air" onclick="getHoroscope('Tula', this)">
+                            <span class="rashi-glyph">♎</span>
+                            <div class="rashi-sanskrit">Tula</div>
+                            <div class="rashi-english">Libra</div>
+                            <span class="rashi-element-tag">💨 Vayu • Venus</span>
+                        </div>
+                        <div class="rashi-card element-water" onclick="getHoroscope('Vrischika', this)">
+                            <span class="rashi-glyph">♏</span>
+                            <div class="rashi-sanskrit">Vrischika</div>
+                            <div class="rashi-english">Scorpio</div>
+                            <span class="rashi-element-tag">🌊 Jala • Mars</span>
+                        </div>
+                        <div class="rashi-card element-fire" onclick="getHoroscope('Dhanu', this)">
+                            <span class="rashi-glyph">♐</span>
+                            <div class="rashi-sanskrit">Dhanu</div>
+                            <div class="rashi-english">Sagittarius</div>
+                            <span class="rashi-element-tag">🔥 Agni • Jupiter</span>
+                        </div>
+                        <div class="rashi-card element-earth" onclick="getHoroscope('Makara', this)">
+                            <span class="rashi-glyph">♑</span>
+                            <div class="rashi-sanskrit">Makara</div>
+                            <div class="rashi-english">Capricorn</div>
+                            <span class="rashi-element-tag">🌍 Prithvi • Saturn</span>
+                        </div>
+                        <div class="rashi-card element-air" onclick="getHoroscope('Kumbha', this)">
+                            <span class="rashi-glyph">♒</span>
+                            <div class="rashi-sanskrit">Kumbha</div>
+                            <div class="rashi-english">Aquarius</div>
+                            <span class="rashi-element-tag">💨 Vayu • Saturn</span>
+                        </div>
+                        <div class="rashi-card element-water" onclick="getHoroscope('Meena', this)">
+                            <span class="rashi-glyph">♓</span>
+                            <div class="rashi-sanskrit">Meena</div>
+                            <div class="rashi-english">Pisces</div>
+                            <span class="rashi-element-tag">🌊 Jala • Jupiter</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Structured Horoscope Result Card -->
+                <div class="horoscope-result-card glass-card" id="horoscopeReading" style="display:none;">
+                    <div class="horoscope-header-banner">
+                        <h3 id="horoscopeReadingTitle">🔮 Vedic Forecast for Mesha (Aries)</h3>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-icon-action" onclick="speakText('horoscopeContent')" title="Read Aloud">🔊</button>
+                            <button class="btn-icon-action" onclick="copyElementText('horoscopeContent')" title="Copy Forecast">📋</button>
+                        </div>
+                    </div>
+                    <div class="reading-content message-body" id="horoscopeContent">
+                        <!-- Streamed markdown content -->
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             4. MILAN (KUNDLI MATCHING) TAB
+             ═══════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-compatibility">
+            <div class="tab-scroll-wrapper">
+                
+                <!-- Milan Birth Forms Card -->
+                <div class="glass-card milan-form-card">
+                    <div class="milan-header">
+                        <h2>❤️ Kundli Milan & Ashtakoot Guna Matching</h2>
+                        <p>Evaluate authentic 36-Guna Vedic compatibility, Nadi Dosha, Bhakoot, and Manglik alignment between two charts.</p>
+                    </div>
+
+                    <form id="compatForm" onsubmit="checkCompatibility(event)">
+                        <div class="milan-dual-grid">
+                            
+                            <!-- Person 1 -->
+                            <div class="person-box">
+                                <div class="person-box-header">
+                                    <h4>Person 1 (Groom / Partner 1)</h4>
+                                    <button type="button" class="autofill-btn" onclick="autofillPerson1()">
+                                        ✨ Use My Profile
+                                    </button>
+                                </div>
+                                <input type="text" id="p1Name" placeholder="Full Name" required>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                                    <input type="date" id="p1Date" required>
+                                    <input type="time" id="p1Time" value="12:00" required>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
+                                    <input type="text" id="p1City" placeholder="City of Birth (e.g. Mumbai)" required>
+                                    <input type="text" id="p1Nation" placeholder="IN" value="IN" maxlength="2" required>
+                                </div>
+                            </div>
+
+                            <div class="milan-heart-divider">
+                                <span>💕</span>
+                            </div>
+
+                            <!-- Person 2 -->
+                            <div class="person-box">
+                                <div class="person-box-header">
+                                    <h4>Person 2 (Bride / Partner 2)</h4>
+                                </div>
+                                <input type="text" id="p2Name" placeholder="Full Name" required>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                                    <input type="date" id="p2Date" required>
+                                    <input type="time" id="p2Time" value="12:00" required>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
+                                    <input type="text" id="p2City" placeholder="City of Birth (e.g. Delhi)" required>
+                                    <input type="text" id="p2Nation" placeholder="IN" value="IN" maxlength="2" required>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <button type="submit" class="btn-primary btn-gold" id="milanSubmitBtn" style="width:100%;">
+                            <span class="btn-text">🔮 Calculate 36-Guna Milan & Synastry</span>
+                            <span class="btn-loader" style="display:none;">
+                                <span class="spinner"></span> Analyzing 8 Kootas & Manglik Dosha...
+                            </span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Milan Results Display -->
+                <div class="milan-results-card glass-card" id="compatResults" style="display:none;">
+                    
+                    <!-- Ashtakoot 36-Guna Score Overview -->
+                    <div class="ashtakoot-score-overview">
+                        <div class="radial-score-meter">
+                            <svg class="meter-svg" width="140" height="140">
+                                <circle class="meter-bg" cx="70" cy="70" r="55"></circle>
+                                <circle class="meter-progress" id="milanMeterCircle" cx="70" cy="70" r="55" stroke="url(#goldGradient)" stroke-dasharray="345.57" stroke-dashoffset="100"></circle>
+                                <defs>
+                                    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#9b72f0" />
+                                        <stop offset="50%" stop-color="#e8b84b" />
+                                        <stop offset="100%" stop-color="#10b981" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="meter-center-text">
+                                <div class="meter-score-num" id="milanScoreNum">28</div>
+                                <div class="meter-max-num">/ 36 Gunas</div>
+                            </div>
+                        </div>
+
+                        <div class="score-verdict-box">
+                            <h3 id="milanVerdictTitle" style="color: var(--accent-emerald);">🌟 Uttam Milan (Favorable Match)</h3>
+                            <p id="milanVerdictDesc">The 8 Kootas demonstrate strong emotional resonance, mutual respect, and spiritual alignment. Suitable for long-term union.</p>
+                        </div>
+                    </div>
+
+                    <!-- Manglik Dosha Comparison Box -->
+                    <div class="manglik-analysis-box" id="manglikAnalysisBox">
+                        <h4>🪐 Manglik Dosha Analysis</h4>
+                        <p id="manglikDetailsText">Evaluating Kuja Dosha from Lagna and Moon for both charts...</p>
+                    </div>
+
+                    <!-- 8 Kootas Breakdown Grid -->
+                    <h4 style="font-family: var(--font-display); color: var(--accent-gold); margin-bottom: 12px;">
+                        📊 Detailed 8 Kootas Breakdown:
+                    </h4>
+                    <div class="kootas-grid" id="kootasGridContainer">
+                        <!-- Injected via JS -->
+                    </div>
+
+                    <!-- Full AI Synastry Reading -->
+                    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--glass-border);">
+                        <h4 style="font-family: var(--font-display); color: var(--accent-gold); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>🪷 Guru's Detailed Astrological Synastry Reading</span>
+                            <button class="btn-icon-action" onclick="copyElementText('compatContent')" title="Copy Synastry Reading">📋</button>
+                        </h4>
+                        <div class="reading-content message-body" id="compatContent">
+                            <!-- Streamed AI Synastry Reading -->
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             5. ANK JYOTISH (NUMEROLOGY) TAB
+             ═══════════════════════════════════════════════════════ -->
+        <section id="tab-numerology" class="tab-content">
+            <div class="tab-scroll-wrapper">
+                
+                <div class="glass-card numerology-calc-card">
+                    <div class="form-header">
+                        <span class="form-icon">🔢</span>
+                        <h2>Ank Jyotish — Vedic Numerology Matrix</h2>
+                        <p>Calculate your Moolank (Root Number), Bhagyank (Destiny / Life Path), and Namank (Name Vibration Number) along with their ruling planetary deities.</p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 600px; margin: 0 auto 16px;">
+                        <div class="form-group">
+                            <label for="numName">Full Name</label>
+                            <input type="text" id="numName" placeholder="Your Name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="numDate">Date of Birth</label>
+                            <input type="date" id="numDate" required>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn-secondary" onclick="autofillNumerology()">
+                            ✨ Use Profile Details
+                        </button>
+                        <button class="btn-primary btn-gold" onclick="calculateAndGenerateNumerology()">
+                            🔮 Calculate Numbers & Generate Reading
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calculated Number Cards Grid -->
+                <div class="numerology-grid-summary" id="numSummaryGrid" style="display:none;">
+                    
+                    <!-- Moolank -->
+                    <div class="number-card">
+                        <div class="number-orb" id="moolankOrb">7</div>
+                        <h4>Moolank (Root Number)</h4>
+                        <div class="number-ruler" id="moolankRuler">Ruling Graha: Ketu ☋</div>
+                        <p class="number-desc" id="moolankDesc">Represents your core personality, internal nature, subconscious instincts, and innate talents.</p>
+                    </div>
+
+                    <!-- Bhagyank -->
+                    <div class="number-card">
+                        <div class="number-orb destiny" id="bhagyankOrb">4</div>
+                        <h4>Bhagyank (Destiny Number)</h4>
+                        <div class="number-ruler" id="bhagyankRuler">Ruling Graha: Rahu ☊</div>
+                        <p class="number-desc" id="bhagyankDesc">Your overarching life path, karmic destiny, career direction, and worldly opportunities.</p>
+                    </div>
+
+                    <!-- Namank -->
+                    <div class="number-card">
+                        <div class="number-orb name-num" id="namankOrb">6</div>
+                        <h4>Namank (Name Number)</h4>
+                        <div class="number-ruler" id="namankRuler">Ruling Graha: Venus ♀</div>
+                        <p class="number-desc" id="namankDesc">Your social expression, external charm, public reputation, and worldly magnetism.</p>
+                    </div>
+
+                </div>
+
+                <!-- Numerology Attributes Matrix -->
+                <div class="glass-card" id="numAttributesCard" style="display:none; padding: 20px;">
+                    <h4 style="font-family: var(--font-display); color: var(--accent-gold); margin-bottom: 12px;">
+                        💎 Auspicious Numerological Correspondences:
+                    </h4>
+                    <div class="numerology-attributes-grid" id="numAttributesGrid">
+                        <!-- Dynamic attribute cards -->
+                    </div>
+                </div>
+
+                <!-- Deep AI Reading Output -->
+                <div class="glass-card" id="numerologyResultCard" style="display:none; padding: 24px;">
+                    <div class="horoscope-header-banner">
+                        <h3 id="numReadingTitle">🪷 Deep Ank Jyotish Interpretation</h3>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-icon-action" onclick="speakText('numerologyContent')" title="Read Aloud">🔊</button>
+                            <button class="btn-icon-action" onclick="copyElementText('numerologyContent')" title="Copy Reading">📋</button>
+                        </div>
+                    </div>
+                    <div id="numerologyContent" class="reading-content message-body"></div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             6. TAROT & PRASHNA TAB (3D GILDED CARDS)
+             ═══════════════════════════════════════════════════════ -->
+        <section id="tab-tarot" class="tab-content">
+            <div class="tab-scroll-wrapper">
+                
+                <div class="glass-card tarot-stage-card">
+                    <div class="form-header">
+                        <span class="form-icon">🃏</span>
+                        <h2>Vedic Prashna & Gilded Tarot Oracle</h2>
+                        <p>Focus your intent and invoke the cosmic forces to receive divine guidance on any pressing query.</p>
+                    </div>
+
+                    <!-- Spread Selector -->
+                    <div class="tarot-spread-selector">
+                        <button class="spread-pill active" data-spread="3card" onclick="setTarotSpread('3card')">
+                            🔮 3-Card Vedic Prashna (Past / Present / Future)
+                        </button>
+                        <button class="spread-pill" data-spread="1card" onclick="setTarotSpread('1card')">
+                            ⚡ 1-Card Instant Guidance
+                        </button>
+                        <button class="spread-pill" data-spread="5card" onclick="setTarotSpread('5card')">
+                            🌟 5-Card Pancha Mahabhuta
+                        </button>
+                    </div>
+
+                    <!-- Prashna Question Input -->
+                    <div style="max-width: 600px; margin: 0 auto 16px;">
+                        <input type="text" id="tarotQuestion" placeholder="e.g. Will I get promoted this year? / Is this relationship auspicious?" style="width: 100%; padding: 12px 16px; border-radius: var(--radius-md); background: rgba(18, 16, 45, 0.7); border: 1px solid var(--glass-border); color: #fff; font-size: 14px;">
+                        
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+                            <button class="suggestion-chip" onclick="setTarotQuery('What energies are currently shaping my career and wealth?')">
+                                💼 Career & Wealth
+                            </button>
+                            <button class="suggestion-chip" onclick="setTarotQuery('What does the universe want me to know about my relationship?')">
+                                ❤️ Love & Harmony
+                            </button>
+                            <button class="suggestion-chip" onclick="setTarotQuery('What spiritual lessons and obstacles should I overcome now?')">
+                                🪷 Spiritual Path
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-gold" onclick="setupTarotDeck()">
+                        🃏 Shuffle Gilded Deck & Pick Cards
+                    </button>
+
+                    <!-- Instructions and Pick Status -->
+                    <p id="tarotInstructions" style="text-align: center; display: none; color: var(--accent-gold); margin: 16px 0 8px; font-weight: 600;">
+                        Select 3 cards from the gilded cosmic fan below (0/3 selected):
+                    </p>
+
+                    <!-- Interactive Card Deck Fan -->
+                    <div class="tarot-deck-fan" id="tarotCardsDisplay">
+                        <!-- Fanned cards injected here -->
+                    </div>
+
+                    <!-- Proceed button when cards are selected -->
+                    <div id="proceedTarotBtnWrap" style="display:none; text-align:center; margin-bottom: 16px;">
+                        <button class="btn-primary" onclick="revealAndReadTarot()" style="font-size: 15px; padding: 12px 28px;">
+                            ✨ Reveal Gilded Cards & Interpret Prashna
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- 3D Gilded Drawn Cards Display Section -->
+                <div class="tarot-drawn-display" id="tarotRevealedDrawnDisplay">
+                    <!-- 3D flip cards injected here -->
+                </div>
+
+                <!-- Tarot Interpretation AI Card -->
+                <div class="glass-card" id="tarotResultCard" style="display:none; padding: 24px;">
+                    <div class="horoscope-header-banner">
+                        <h3 id="tarotReadingTitle">🔮 Vedic Prashna & Tarot Synthesis</h3>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-icon-action" onclick="speakText('tarotContent')" title="Read Aloud">🔊</button>
+                            <button class="btn-icon-action" onclick="copyElementText('tarotContent')" title="Copy Interpretation">📋</button>
+                        </div>
+                    </div>
+                    <div id="tarotContent" class="reading-content message-body"></div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ═══════════════ MODALS ═══════════════ -->
+
+    <!-- Gochar Matrix Modal -->
+    <div class="modal-overlay" id="gocharModal">
+        <div class="modal-card glass-card">
+            <button class="modal-close-btn" onclick="closeGocharModal()">&times;</button>
+            <h3 style="font-family: var(--font-display); color: var(--accent-gold); margin-bottom: 8px;">
+                🪐 Live Planetary Gochar Matrix (Current Transits)
+            </h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                Real-time Sidereal planetary longitudes computed with Lahiri Ayanamsa.
+            </p>
+            <div id="gocharModalContent">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Birth Details Modal -->
+    <div class="modal-overlay" id="birthModal">
+        <div class="modal-card glass-card">
+            <button class="modal-close-btn" onclick="closeBirthModal()">&times;</button>
+            <div class="form-header" style="margin-bottom: 16px;">
+                <span class="form-icon">🪷</span>
+                <h3 style="font-family: var(--font-display); color: var(--accent-gold);">Update Birth Coordinates</h3>
+                <p style="font-size: 12.5px; color: var(--text-secondary);">Recalculate your Janma Kundli with updated date, time, or city.</p>
+            </div>
+            <form id="modalBirthForm" onsubmit="submitModalBirthDetails(event)">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="modalName">Name</label>
+                        <input type="text" id="modalName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalBirthDate">Birth Date</label>
+                        <input type="date" id="modalBirthDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalBirthTime">Birth Time</label>
+                        <input type="time" id="modalBirthTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalCity">City</label>
+                        <input type="text" id="modalCity" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalNation">Country Code</label>
+                        <input type="text" id="modalNation" maxlength="2" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">
+                    ✨ Recalculate Kundli
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Third-party Scripts: Markdown Parser & DOMPurify Sanitizer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    
+    <!-- Application Logic Script -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
