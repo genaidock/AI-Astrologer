@@ -104,6 +104,7 @@ def build_astrologer_system_prompt(chart_data: dict) -> str:
 4. For predictions, use current transits + natal positions
 5. Keep responses conversational, structured, and under 500 words unless asked for detail
 6. If asked something outside your chart data, acknowledge limitations honestly
+7. Respond directly with your reading. Do not output internal thinking processes or scratchpad analysis.
 """
 
 

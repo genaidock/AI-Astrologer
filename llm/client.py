@@ -141,9 +141,12 @@ async def _stream_response(
                             try:
                                 chunk = json.loads(data)
                                 delta = chunk.get("choices", [{}])[0].get("delta", {})
+                                # Support standard OpenAI content as well as reasoning/reasoning_content (Qwen, DeepSeek R1 in Ollama)
                                 content = delta.get("content", "")
-                                if content:
-                                    yield content
+                                reasoning = delta.get("reasoning", "") or delta.get("reasoning_content", "")
+                                text_chunk = content or reasoning
+                                if text_chunk:
+                                    yield text_chunk
                             except json.JSONDecodeError:
                                 continue
                 return
@@ -186,7 +189,8 @@ async def _full_response(url: str, headers: dict, payload: dict) -> str:
                     return f"Error: LLM API returned status {resp.status_code}: {resp.text}"
 
                 data = resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                msg = data.get("choices", [{}])[0].get("message", {})
+                return msg.get("content", "") or msg.get("reasoning", "") or msg.get("reasoning_content", "")
             except httpx.ReadTimeout:
                 return f"Error: Request to AI model timed out after {LLM_TIMEOUT}s."
             except (httpx.ConnectError, httpx.ConnectTimeout) as e:

@@ -94,7 +94,8 @@ async def chat_with_astrologer(req: ChatRequest, request: Request):
             "Warmly greet them and ask for their birth date, time, and place "
             "to generate their Kundli (Vedic birth chart). "
             "Use Vedic astrology terminology with English explanations. "
-            "Be warm, wise, and use celestial emojis (🌙 ☀️ ⭐ 🪐 ✨ 🔮)."
+            "Be warm, wise, and use celestial emojis (🌙 ☀️ ⭐ 🪐 ✨ 🔮). "
+            "Respond directly and warmly without internal reasoning tags or thinking steps."
         )
 
     messages.append({"role": "system", "content": system_prompt})
