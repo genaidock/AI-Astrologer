@@ -1,7 +1,7 @@
 """
 AI Astrologer — FastAPI Application Entry Point
 
-A Vedic Astrology (Jyotish) chatbot powered by Kerykeion + CodeCraft API.
+A Vedic Astrology (Jyotish) chatbot powered by Kerykeion + LLM (Ollama / CodeCraft / OpenAI).
 """
 
 import logging
@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from config import HOST, PORT
+from config import HOST, PORT, LLM_API_BASE, LLM_MODEL, CORS_ORIGINS
 from limiter import limiter
 from routes.chart import router as chart_router
 from routes.chat import router as chat_router
@@ -25,6 +25,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
 )
+logger = logging.getLogger("ai_astrologer")
 
 # Create FastAPI app
 app = FastAPI(
@@ -37,17 +38,35 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — credentials require an explicit origin list (wildcard + credentials is rejected by browsers)
-# In production, replace with your actual frontend origin(s).
-import os as _os
-_cors_origins = [o.strip() for o in _os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS Configuration
+parsed_origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+if "*" in parsed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=parsed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+# Health check endpoint for Coolify / Docker monitoring
+@app.get("/api/health", tags=["system"])
+async def health_check():
+    """Health check endpoint used by Docker healthchecks and reverse proxies."""
+    return {
+        "status": "ok",
+        "service": "AI Astrologer",
+        "llm_base": LLM_API_BASE,
+        "model": LLM_MODEL,
+    }
 
 # Register API routes
 app.include_router(chart_router)
@@ -60,6 +79,8 @@ if static_dir.exists():
 
 
 if __name__ == "__main__":
+    logger.info(f"Starting AI Astrologer on {HOST}:{PORT}")
+    logger.info(f"Connected to LLM: {LLM_MODEL} at {LLM_API_BASE}")
     uvicorn.run(
         "main:app",
         host=HOST,
@@ -67,3 +88,4 @@ if __name__ == "__main__":
         reload=False,
         log_level="info",
     )
+

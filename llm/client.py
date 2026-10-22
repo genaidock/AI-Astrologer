@@ -1,5 +1,5 @@
 """
-Async client for CodeCraft API — OpenAI-compatible chat completions.
+Async client for LLM APIs (Ollama, CodeCraft, OpenAI-compatible).
 
 Supports both streaming (SSE) and non-streaming modes.
 """
@@ -10,12 +10,18 @@ from typing import AsyncGenerator
 
 import httpx
 
-from config import CODECRAFT_API_KEY, CODECRAFT_API_BASE, CODECRAFT_MODEL
+from config import (
+    LLM_API_KEY,
+    LLM_API_BASE,
+    LLM_MODEL,
+    LLM_THINK,
+    LLM_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
 
-# Timeout: 30s connect, 120s read (LLM responses can be slow)
-TIMEOUT = httpx.Timeout(30.0, read=120.0)
+# Configurable timeout: 30s connect, LLM_TIMEOUT (default 300s) read
+TIMEOUT = httpx.Timeout(30.0, read=LLM_TIMEOUT)
 
 
 async def chat_completion(
@@ -26,11 +32,11 @@ async def chat_completion(
     max_tokens: int = 2048,
 ) -> AsyncGenerator[str, None] | str:
     """
-    Call CodeCraft API chat completions endpoint.
+    Call OpenAI-compatible chat completions endpoint (Ollama, CodeCraft, OpenAI).
 
     Args:
         messages: List of {"role": ..., "content": ...} dicts
-        model: Model ID (defaults to config CODECRAFT_MODEL)
+        model: Model ID (defaults to config LLM_MODEL)
         stream: If True, yields chunks as an async generator
         temperature: Creativity control (0.0–2.0)
         max_tokens: Max response length
@@ -38,27 +44,34 @@ async def chat_completion(
     Returns:
         Async generator of text chunks (stream=True) or full text (stream=False)
     """
-    if not CODECRAFT_API_KEY:
-        raise ValueError(
-            "CODECRAFT_API_KEY is not set. "
-            "Copy .env.example to .env and add your key."
-        )
-
-    url = f"{CODECRAFT_API_BASE}/chat/completions"
+    url = f"{LLM_API_BASE}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {CODECRAFT_API_KEY}",
         "Content-Type": "application/json",
     }
+    if LLM_API_KEY:
+        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+
+    target_model = model or LLM_MODEL
+
     payload = {
-        "model": model or CODECRAFT_MODEL,
+        "model": target_model,
         "messages": messages,
         "stream": stream,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
 
+    # Ollama reasoning/thinking control:
+    # When LLM_THINK is False, suppress internal reasoning to ensure fast ~5-15s generation
+    is_ollama = "11434" in LLM_API_BASE or "ollama" in LLM_API_BASE.lower()
+    if is_ollama:
+        payload["options"] = {"temperature": temperature}
+        if not LLM_THINK:
+            payload["think"] = False
+
+    logger.debug(f"Calling LLM: model={target_model}, url={url}, stream={stream}")
+
     if stream:
-        logger.debug(f"Using model: {payload['model']} and URL: {url}")
         return _stream_response(url, headers, payload)
     else:
         return await _full_response(url, headers, payload)
@@ -69,52 +82,99 @@ async def _stream_response(
 ) -> AsyncGenerator[str, None]:
     """Stream SSE chunks from the API."""
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        async with client.stream("POST", url, headers=headers, json=payload) as resp:
-            if resp.status_code != 200:
-                body = await resp.aread()
-                logger.error(f"CodeCraft API error {resp.status_code}: {body.decode()}")
-                yield f"Error: API returned status {resp.status_code}"
-                return
+        try:
+            async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    logger.error(f"LLM API error {resp.status_code}: {body.decode(errors='replace')}")
+                    yield f"Error: LLM API returned status {resp.status_code}"
+                    return
 
-            async for line in resp.aiter_lines():
-                if not line.strip():
-                    continue
-                if line.startswith("data: "):
-                    data = line[6:]
-                    if data.strip() == "[DONE]":
-                        return
-                    try:
-                        chunk = json.loads(data)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            yield content
-                    except json.JSONDecodeError:
+                async for line in resp.aiter_lines():
+                    if not line.strip():
                         continue
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data.strip() == "[DONE]":
+                            return
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+        except httpx.ConnectError:
+            logger.error(f"Cannot connect to LLM server at {url}. Is Ollama or the API service running?")
+            yield "Error: Could not connect to the AI model server. Please verify the Ollama endpoint is running."
+        except httpx.ReadTimeout:
+            logger.error(f"LLM request timed out after {LLM_TIMEOUT}s at {url}")
+            yield "Error: The model took too long to respond. Please try again."
 
 
 async def _full_response(url: str, headers: dict, payload: dict) -> str:
     """Get full (non-streaming) response from the API."""
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        resp = await client.post(url, headers=headers, json=payload)
+        try:
+            resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code != 200:
+                logger.error(f"LLM API error {resp.status_code}: {resp.text}")
+                return f"Error: LLM API returned status {resp.status_code}"
 
-        if resp.status_code != 200:
-            logger.error(f"CodeCraft API error {resp.status_code}: {resp.text}")
-            return f"Error: API returned status {resp.status_code}"
+            data = resp.json()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        except httpx.ConnectError:
+            logger.error(f"Cannot connect to LLM server at {url}")
+            return "Error: Could not connect to the AI model server."
+        except httpx.ReadTimeout:
+            logger.error(f"LLM request timed out at {url}")
+            return "Error: Request to AI model timed out."
 
-        data = resp.json()
-        return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
 async def get_models() -> list[dict]:
-    """Fetch available models from CodeCraft API catalog."""
-    if not CODECRAFT_API_KEY:
-        return []
-        
-    url = f"{CODECRAFT_API_BASE}/models"
-    headers = {"Authorization": f"Bearer {CODECRAFT_API_KEY}"}
-    
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        resp = await client.get(url, headers=headers)
-        if resp.status_code == 200:
-            return resp.json().get("data", [])
-        return []
+    """
+    Fetch available models from Ollama / OpenAI-compatible / CodeCraft API catalog.
+    Falls back gracefully to the configured default model if endpoint is unavailable.
+    """
+    url = f"{LLM_API_BASE}/models"
+    headers = {}
+    if LLM_API_KEY:
+        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                if data:
+                    return [
+                        {
+                            "id": m.get("id"),
+                            "display_name": m.get("name") or m.get("id"),
+                        }
+                        for m in data
+                        if m.get("id")
+                    ]
+            
+            # If /v1/models fails or is empty, try Ollama native /api/tags
+            if "11434" in LLM_API_BASE or "ollama" in LLM_API_BASE.lower():
+                root_base = LLM_API_BASE.replace("/v1", "")
+                tags_resp = await client.get(f"{root_base}/api/tags")
+                if tags_resp.status_code == 200:
+                    models_list = tags_resp.json().get("models", [])
+                    if models_list:
+                        return [
+                            {
+                                "id": m.get("name") or m.get("model"),
+                                "display_name": m.get("name") or m.get("model"),
+                            }
+                            for m in models_list
+                            if m.get("name") or m.get("model")
+                        ]
+    except Exception as e:
+        logger.warning(f"Could not load dynamic models list from {url}: {e}")
+
+    # Fallback to configured model so frontend always has an active model option
+    return [{"id": LLM_MODEL, "display_name": LLM_MODEL}]
+

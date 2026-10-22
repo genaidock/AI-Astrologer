@@ -13,9 +13,32 @@ A full-stack **Vedic Astrology (Jyotish) AI Chatbot** that computes your Kundli 
 | **🌙 Nakshatras** | All 27 Nakshatras with Padas computed |
 | **🪐 9 Grahas** | Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Rahu, Ketu |
 
-## 🚀 Quick Start
+## 🚀 Deployment
 
-### 1. Create virtual environment
+### Option A: Deploy on Coolify (Oracle Cloud Server)
+
+This repository includes a production `Dockerfile` and `docker-compose.yml` pre-configured to run seamlessly on Coolify (including Oracle Cloud ARM64 Ampere instances).
+
+1. Open your Coolify dashboard (e.g. `http://130.210.19.223:8000`).
+2. Go to **Projects** → select your project & environment.
+3. Click **+ New Resource** → **Git Repository** (Public or Private).
+4. Enter `https://github.com/genaidock/AI-Astrologer.git` (branch `main`).
+5. Choose **Docker Compose** or **Dockerfile** build pack.
+6. Under **Environment Variables**, set:
+   ```env
+   PORT=8000
+   HOST=0.0.0.0
+   LLM_API_BASE=http://host.docker.internal:11434/v1
+   LLM_MODEL=qwen3.6-35b
+   LLM_API_KEY=ollama
+   LLM_THINK=false
+   CORS_ORIGINS=*
+   ```
+7. Click **Deploy**. The app will be available on your assigned domain or port `8000`.
+
+### Option B: Local Development
+
+#### 1. Create virtual environment
 ```bash
 python -m venv venv
 # Windows
@@ -24,23 +47,24 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 2. Install dependencies
+#### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure API key
+#### 3. Configure environment
 ```bash
 copy .env.example .env
-# Edit .env and add your CodeCraft API key
+# Edit .env and set your Ollama or OpenAI-compatible API credentials
 ```
 
-### 4. Run the server
+#### 4. Run the server
 ```bash
 python main.py
 ```
 
 Open **http://localhost:8000** in your browser 🎉
+
 
 ## 🛠️ Tech Stack
 

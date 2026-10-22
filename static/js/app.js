@@ -231,16 +231,23 @@ async function loadModels() {
         const savedModel = localStorage.getItem("jyotish_model");
         select.innerHTML = "";
 
+        let hasSelected = false;
         for (const m of models) {
             const opt = document.createElement("option");
             opt.value = m.id;
             opt.textContent = m.display_name || m.id;
             if (savedModel && m.id === savedModel) {
                 opt.selected = true;
-            } else if (!savedModel && m.id.includes("claude-opus")) {
+                hasSelected = true;
+            } else if (!savedModel && !hasSelected && (m.id.includes("qwen") || m.id.includes("claude-opus"))) {
                 opt.selected = true;
+                hasSelected = true;
             }
             select.appendChild(opt);
+        }
+
+        if (!hasSelected && select.options.length > 0) {
+            select.selectedIndex = 0;
         }
 
         select.addEventListener("change", (e) => {
