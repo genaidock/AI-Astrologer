@@ -7,19 +7,21 @@ services:
       dockerfile: Dockerfile
     container_name: ai-astrologer
     restart: unless-stopped
-    # Enables communication with Ollama running on the Oracle host machine
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # extra_hosts not needed for OmniRoute (accessible via public IP on same server)
+    # Uncomment below if switching back to host Ollama:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
     environment:
       # Port & Host
       - PORT=8000
       - HOST=0.0.0.0
-      # LLM Connection to Host Ollama
-      - LLM_API_BASE=http://host.docker.internal:11434/v1
-      - LLM_MODEL=qwen3.6-35b
-      - LLM_API_KEY=ollama
+      # LLM via OmniRoute (running on same Oracle server, port 20128)
+      # OmniRoute is an OpenAI-compatible gateway that routes to 350+ AI providers.
+      - LLM_API_BASE=http://130.210.19.223:20128/v1
+      - LLM_API_KEY=sk-9fff06bc81bb97f3-58de2b-9d94a3e2
+      - LLM_MODEL=auto
       - LLM_THINK=false
-      - LLM_TIMEOUT=300
+      - LLM_TIMEOUT=120
       # Web / CORS
       - CORS_ORIGINS=*
     ports:

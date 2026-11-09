@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Jyotish Guru">
+    <meta name="theme-color" content="#070714">
+    <meta name="format-detection" content="telephone=no">
     <title>🔮 AI Jyotish Guru — Vedic Astrologer & Cosmic Oracle</title>
     
     <!-- Google Fonts -->
@@ -22,53 +27,55 @@
 
         <!-- ─── Header ─── -->
         <header class="app-header">
-            <div class="logo-area" onclick="switchTab('chat')">
-                <span class="logo-icon">🔮</span>
-                <div class="logo-title">
-                    <h1>Jyotish Guru</h1>
-                    <span class="logo-subtitle">
-                        Vedic Astrologer & Oracle
-                        <span class="live-badge"><span class="pulse-dot"></span> LIVE</span>
-                    </span>
+            <div class="header-main-bar">
+                <div class="logo-area" onclick="switchTab('chat')">
+                    <span class="logo-icon">🔮</span>
+                    <div class="logo-title">
+                        <h1>Jyotish Guru</h1>
+                        <span class="logo-subtitle">
+                            Vedic Astrologer & Oracle
+                            <span class="live-badge"><span class="pulse-dot"></span> LIVE</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Header Actions: User profile, Brain selector -->
+                <div class="header-actions">
+                    <div id="userProfileChip" class="user-profile-chip" style="display:none;" onclick="openBirthModal()" title="Click to view or edit birth chart details">
+                        <span>👤</span>
+                        <span id="userProfileText">Seeker</span>
+                        <span style="font-size: 10px; opacity: 0.7;">✏️</span>
+                    </div>
+
+                    <div class="model-selector-pill" title="Select AI Reasoning Model">
+                        <span class="model-pill-icon">✨</span>
+                        <select id="modelSelect" class="model-selector" aria-label="AI Model">
+                            <option value="claude-opus-4.8">claude-opus-4.8</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <!-- Header Controls: User profile, Brain selector, Nav tabs -->
-            <div class="header-controls">
-                <div id="userProfileChip" class="user-profile-chip" style="display:none;" onclick="openBirthModal()" title="Click to view or edit birth chart details">
-                    <span>👤</span>
-                    <span id="userProfileText">Seeker</span>
-                    <span style="font-size: 10px; opacity: 0.7;">✏️</span>
-                </div>
-
-                <div class="model-selector-pill" title="Select AI Reasoning Model">
-                    <span class="model-pill-icon">✨</span>
-                    <select id="modelSelect" class="model-selector">
-                        <option value="claude-opus-4.8">claude-opus-4.8</option>
-                    </select>
-                </div>
-
-                <nav class="nav-tabs" id="mainNavTabs">
-                    <button class="nav-tab active" data-tab="chat" onclick="switchTab('chat')">
-                        <span>💬</span> Chat
-                    </button>
-                    <button class="nav-tab" data-tab="kundli" onclick="switchTab('kundli')">
-                        <span>🪷</span> Kundli
-                    </button>
-                    <button class="nav-tab" data-tab="horoscope" onclick="switchTab('horoscope')">
-                        <span>⭐</span> Rashifal
-                    </button>
-                    <button class="nav-tab" data-tab="compatibility" onclick="switchTab('compatibility')">
-                        <span>❤️</span> Milan
-                    </button>
-                    <button class="nav-tab" data-tab="numerology" onclick="switchTab('numerology')">
-                        <span>🔢</span> Ank Jyotish
-                    </button>
-                    <button class="nav-tab" data-tab="tarot" onclick="switchTab('tarot')">
-                        <span>🃏</span> Tarot & Prashna
-                    </button>
-                </nav>
-            </div>
+            <nav class="nav-tabs" id="mainNavTabs" aria-label="Main Navigation">
+                <button class="nav-tab active" data-tab="chat" onclick="switchTab('chat')">
+                    <span class="nav-tab-icon">💬</span> <span class="nav-tab-label">Chat</span>
+                </button>
+                <button class="nav-tab" data-tab="kundli" onclick="switchTab('kundli')">
+                    <span class="nav-tab-icon">🪷</span> <span class="nav-tab-label">Kundli</span>
+                </button>
+                <button class="nav-tab" data-tab="horoscope" onclick="switchTab('horoscope')">
+                    <span class="nav-tab-icon">⭐</span> <span class="nav-tab-label">Rashifal</span>
+                </button>
+                <button class="nav-tab" data-tab="compatibility" onclick="switchTab('compatibility')">
+                    <span class="nav-tab-icon">❤️</span> <span class="nav-tab-label">Milan</span>
+                </button>
+                <button class="nav-tab" data-tab="numerology" onclick="switchTab('numerology')">
+                    <span class="nav-tab-icon">🔢</span> <span class="nav-tab-label">Ank Jyotish</span>
+                </button>
+                <button class="nav-tab" data-tab="tarot" onclick="switchTab('tarot')">
+                    <span class="nav-tab-icon">🃏</span> <span class="nav-tab-label">Tarot & Prashna</span>
+                </button>
+            </nav>
         </header>
 
         <!-- ─── Live Planetary Transit Ticker (Gochar Bar) ─── -->
@@ -176,6 +183,9 @@
                             id="chatInput" 
                             placeholder="Ask Guru about your chart, planets, Dashas, remedies..." 
                             rows="1"
+                            enterkeyhint="send"
+                            autocomplete="off"
+                            autocorrect="on"
                             onkeydown="handleChatKeydown(event)"
                         ></textarea>
                         <div class="input-quick-actions">
@@ -484,14 +494,14 @@
                                         ✨ Use My Profile
                                     </button>
                                 </div>
-                                <input type="text" id="p1Name" placeholder="Full Name" required>
+                                <input type="text" id="p1Name" class="milan-input" placeholder="Full Name" required>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                                    <input type="date" id="p1Date" required>
-                                    <input type="time" id="p1Time" value="12:00" required>
+                                    <input type="date" id="p1Date" class="milan-input" required>
+                                    <input type="time" id="p1Time" class="milan-input" value="12:00" required>
                                 </div>
                                 <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
-                                    <input type="text" id="p1City" placeholder="City of Birth (e.g. Mumbai)" required>
-                                    <input type="text" id="p1Nation" placeholder="IN" value="IN" maxlength="2" required>
+                                    <input type="text" id="p1City" class="milan-input" placeholder="City of Birth (e.g. Mumbai)" required>
+                                    <input type="text" id="p1Nation" class="milan-input" placeholder="IN" value="IN" maxlength="2" required>
                                 </div>
                             </div>
 
@@ -504,14 +514,14 @@
                                 <div class="person-box-header">
                                     <h4>Person 2 (Bride / Partner 2)</h4>
                                 </div>
-                                <input type="text" id="p2Name" placeholder="Full Name" required>
+                                <input type="text" id="p2Name" class="milan-input" placeholder="Full Name" required>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                                    <input type="date" id="p2Date" required>
-                                    <input type="time" id="p2Time" value="12:00" required>
+                                    <input type="date" id="p2Date" class="milan-input" required>
+                                    <input type="time" id="p2Time" class="milan-input" value="12:00" required>
                                 </div>
                                 <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
-                                    <input type="text" id="p2City" placeholder="City of Birth (e.g. Delhi)" required>
-                                    <input type="text" id="p2Nation" placeholder="IN" value="IN" maxlength="2" required>
+                                    <input type="text" id="p2City" class="milan-input" placeholder="City of Birth (e.g. Delhi)" required>
+                                    <input type="text" id="p2Nation" class="milan-input" placeholder="IN" value="IN" maxlength="2" required>
                                 </div>
                             </div>
 
@@ -701,7 +711,7 @@
 
                     <!-- Prashna Question Input -->
                     <div style="max-width: 600px; margin: 0 auto 16px;">
-                        <input type="text" id="tarotQuestion" placeholder="e.g. Will I get promoted this year? / Is this relationship auspicious?" style="width: 100%; padding: 12px 16px; border-radius: var(--radius-md); background: rgba(18, 16, 45, 0.7); border: 1px solid var(--glass-border); color: #fff; font-size: 14px;">
+                        <input type="text" id="tarotQuestion" class="tarot-query-input" placeholder="e.g. Will I get promoted this year? / Is this relationship auspicious?">
                         
                         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
                             <button class="suggestion-chip" onclick="setTarotQuery('What energies are currently shaping my career and wealth?')">

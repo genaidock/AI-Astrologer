@@ -177,6 +177,30 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(() => {
         loadLiveTransits();
     }, 60000);
+
+    // Dismiss modals when tapping outer backdrop overlay
+    document.querySelectorAll(".modal-overlay").forEach(overlay => {
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) {
+                overlay.classList.remove("active");
+            }
+        });
+    });
+
+    // iOS Safari virtual keyboard viewport adjustment
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", () => {
+            const chatInput = document.getElementById("chatInput");
+            if (document.activeElement === chatInput) {
+                const chatMessages = document.getElementById("chatMessages");
+                if (chatMessages) {
+                    setTimeout(() => {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }, 80);
+                }
+            }
+        });
+    }
 });
 
 // ── Starfield & Shooting Stars ───────────────────────────
@@ -344,7 +368,10 @@ function switchTab(tabName) {
     const tabBtn = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
     const tabEl = document.getElementById(`tab-${tabName}`);
 
-    if (tabBtn) tabBtn.classList.add("active");
+    if (tabBtn) {
+        tabBtn.classList.add("active");
+        tabBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
     if (tabEl) tabEl.classList.add("active");
 
     if (tabName === "kundli" && chartData) {
@@ -979,6 +1006,14 @@ function selectKundliHouse(hNum) {
                 </span>
             `;
         }).join("");
+    }
+
+    // On mobile devices, smoothly scroll down to inspector so the user gets immediate feedback
+    if (window.innerWidth <= 860) {
+        const inspector = document.getElementById("houseInspectorCard");
+        if (inspector) {
+            inspector.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
     }
 }
 
